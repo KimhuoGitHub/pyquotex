@@ -1,0 +1,8 @@
+{
+    "assets": [
+        {
+            "name": "EURUSD",
+            "enabled": true
+        }
+    ]
+}
