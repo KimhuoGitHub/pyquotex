@@ -7,16 +7,8 @@ from . import global_value
 from .api import QuotexAPI
 from .constants import codes_asset
 from .utils.services import truncate
-from .utils.processor import (
-    calculate_candles,
-    process_candles_v2,
-    merge_candles
-)
-from .config import (
-    load_session,
-    update_session,
-    resource_path
-)
+from .utils.processor import calculate_candles, process_candles_v2, merge_candles
+from .config import load_session, update_session, resource_path
 
 __version__ = "1.0.0"
 logger = logging.getLogger(__name__)
@@ -25,16 +17,16 @@ logger = logging.getLogger(__name__)
 class Quotex(object):
 
     def __init__(
-            self,
-            email,
-            password,
-            lang="pt",
-            email_pass=None,
-            user_agent="Quotex/1.0",
-            root_path=".",
-            user_data_dir="browser",
-            asset_default="EURUSD",
-            period_default=60
+        self,
+        email,
+        password,
+        lang="en",
+        email_pass=None,
+        user_agent="Quotex/1.0",
+        root_path=".",
+        user_data_dir="browser",
+        asset_default="EURUSD",
+        period_default=60,
     ):
         self.size = [
             1,
@@ -90,11 +82,7 @@ class Quotex(object):
             return False
 
     def set_session(self, user_agent: str, cookies: str = None, ssid: str = None):
-        session = {
-            "cookies": cookies,
-            "token": ssid,
-            "user_agent": user_agent
-        }
+        session = {"cookies": cookies, "token": ssid, "user_agent": user_agent}
         self.session_data = update_session(session)
 
     async def re_subscribe_stream(self):
@@ -194,7 +182,9 @@ class Quotex(object):
             list: List of prepared candles data.
         """
         candles_data = calculate_candles(self.api.candles.candles_data, period)
-        candles_v2_data = process_candles_v2(self.api.candle_v2_data, asset, candles_data)
+        candles_v2_data = process_candles_v2(
+            self.api.candle_v2_data, asset, candles_data
+        )
         new_candles = merge_candles(candles_v2_data)
 
         return new_candles
@@ -207,7 +197,7 @@ class Quotex(object):
             self.lang,
             email_pass=self.email_pass,
             resource_path=self.resource_path,
-            user_data_dir=self.user_data_dir
+            user_data_dir=self.user_data_dir,
         )
         self.api.trace_ws = self.debug_ws_enable
         self.api.session_data = self.session_data
@@ -247,8 +237,11 @@ class Quotex(object):
     async def get_balance(self):
         while self.api.account_balance is None:
             await asyncio.sleep(0.5)
-        balance = self.api.account_balance.get("demoBalance") \
-            if self.api.account_type > 0 else self.api.account_balance.get("liveBalance")
+        balance = (
+            self.api.account_balance.get("demoBalance")
+            if self.api.account_type > 0
+            else self.api.account_balance.get("liveBalance")
+        )
         return float(f"{truncate(balance + self.get_profit(), 2):.2f}")
 
     async def get_profile(self):
@@ -299,11 +292,8 @@ class Quotex(object):
             assets_data[i[2].replace("\n", "")] = {
                 "turbo_payment": i[18],
                 "payment": i[5],
-                "profit": {
-                    "1M": i[-9],
-                    "5M": i[-8]
-                },
-                "open": i[14]
+                "profit": {"1M": i[-9], "5M": i[-8]},
+                "open": i[14],
             }
         return assets_data
 
@@ -313,7 +303,10 @@ class Quotex(object):
         remaing_time = int((expiration_stamp - now_stamp).total_seconds())
         while remaing_time >= 0:
             remaing_time -= 1
-            print(f"\rRestando {remaing_time if remaing_time > 0 else 0} segundos ...", end="")
+            print(
+                f"\rRestando {remaing_time if remaing_time > 0 else 0} segundos ...",
+                end="",
+            )
             await asyncio.sleep(1)
         await asyncio.sleep(5)
 
@@ -352,7 +345,7 @@ class Quotex(object):
                 return self.api.real_time_candles
             await asyncio.sleep(0.5)
 
-    async def start_realtime_price(self,  asset: str, period: int = 0):
+    async def start_realtime_price(self, asset: str, period: int = 0):
         self.api.subscribe_realtime_candle(asset, period)
         self.api.follow_candle(asset)
 
@@ -400,8 +393,7 @@ class Quotex(object):
         self.api.candle_generated_check[str(asset)][int(size)] = {}
         while True:
             if time.time() - start > 20:
-                logger.error(
-                    '**error** start_candles_one_stream late for 20 sec')
+                logger.error("**error** start_candles_one_stream late for 20 sec")
                 return False
             try:
                 if self.api.candle_generated_check[str(asset)][int(size)]:
@@ -411,7 +403,7 @@ class Quotex(object):
             try:
                 self.api.follow_candle(codes_asset[asset])
             except:
-                logger.error('**error** start_candles_stream reconnect')
+                logger.error("**error** start_candles_stream reconnect")
                 await self.connect()
             await asyncio.sleep(0.5)
 
@@ -422,7 +414,9 @@ class Quotex(object):
         start = time.time()
         while True:
             if time.time() - start > 20:
-                logger.error(f'**error** fail {asset} start_candles_all_size_stream late for 10 sec')
+                logger.error(
+                    f"**error** fail {asset} start_candles_all_size_stream late for 10 sec"
+                )
                 return False
             try:
                 if self.api.candle_generated_all_size_check[str(asset)]:
@@ -432,8 +426,7 @@ class Quotex(object):
             try:
                 self.api.subscribe_all_size(codes_asset[asset])
             except:
-                logger.error(
-                    '**error** start_candles_all_size_stream reconnect')
+                logger.error("**error** start_candles_all_size_stream reconnect")
                 await self.connect()
             await asyncio.sleep(0.5)
 
@@ -441,8 +434,7 @@ class Quotex(object):
         if asset not in self.subscribe_mood:
             self.subscribe_mood.append(asset)
         while True:
-            self.api.subscribe_Traders_mood(
-                asset[asset], instrument)
+            self.api.subscribe_Traders_mood(asset[asset], instrument)
             try:
                 self.api.traders_mood[codes_asset[asset]] = codes_asset[asset]
                 break

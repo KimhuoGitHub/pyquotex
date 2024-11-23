@@ -6,14 +6,8 @@ import random
 import asyncio
 import pyfiglet
 from pathlib import Path
-from quotexapi.expiration import (
-    timestamp_to_date,
-    get_timestamp_days_ago
-)
-from quotexapi.config import (
-    email,
-    password
-)
+from quotexapi.expiration import timestamp_to_date, get_timestamp_days_ago
+from quotexapi.config import email, password
 from quotexapi.stable_api import Quotex
 from quotexapi.utils.processor import process_candles, get_color
 
@@ -25,7 +19,9 @@ Use com moderação, pois gerenciamento é tudo!
 suporte: cleiton.leonel@gmail.com ou +55 (27) 9 9577-2291
 """
 
-USER_AGENT = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/119.0"
+USER_AGENT = (
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/119.0"
+)
 
 custom_font = pyfiglet.Figlet(font="ansi_shadow")
 ascii_art = custom_font.renderText("PyQuotex")
@@ -35,12 +31,12 @@ art_effect = f"""{ascii_art}
         {__message__}
 """
 
-print(art_effect)
+# print(art_effect)
 
 client = Quotex(
     email=email,
     password=password,
-    lang="pt",  # Default pt -> Português.
+    lang="en",  # Default pt -> Português.
 )
 
 # client.debug_ws_enable = True
@@ -120,11 +116,13 @@ async def buy_simple():
     check_connect, message = await client.connect()
     if check_connect:
         # client.change_account("REAL")
-        amount = 50
+        amount = 1
         asset = "AUDCAD"  # "EURUSD_otc"
         direction = "call"
         duration = 60  # in seconds
-        asset_name, asset_data = await client.get_available_asset(asset, force_open=True)
+        asset_name, asset_data = await client.get_available_asset(
+            asset, force_open=True
+        )
         print(asset_name, asset_data)
         if asset_data[2]:
             print("OK: Asset está aberto.")
@@ -143,7 +141,9 @@ async def buy_simple():
 async def get_result():
     check_connect, reason = await client.connect()
     if check_connect:
-        status, operation_info  = await client.get_result('578da9eb-613d-4c4c-a345-2bab05ba3966')
+        status, operation_info = await client.get_result(
+            "578da9eb-613d-4c4c-a345-2bab05ba3966"
+        )
         print(status, operation_info)
     print("Saindo...")
 
@@ -187,11 +187,13 @@ async def buy_and_check_win():
     if check_connect:
         # client.change_account("REAL")
         print("Saldo corrente: ", await client.get_balance())
-        amount = 50
-        asset = "EURUSD_otc"  # "EURUSD_otc"
+        amount = 1
+        asset = "EURUSD"  # "EURUSD_otc"
         direction = "call"
         duration = 60  # in seconds
-        asset_name, asset_data = await client.get_available_asset(asset, force_open=True)
+        asset_name, asset_data = await client.get_available_asset(
+            asset, force_open=True
+        )
         print(asset_name, asset_data)
         if asset_data[2]:
             print("OK: Asset está aberto.")
@@ -200,9 +202,13 @@ async def buy_and_check_win():
             if status:
                 print("Aguardando resultado...")
                 if await client.check_win(buy_info["id"]):
-                    print(f"\nWin!!! \nVencemos moleque!!!\nLucro: R$ {client.get_profit()}")
+                    print(
+                        f"\nWin!!! \nVencemos moleque!!!\nLucro: R$ {client.get_profit()}"
+                    )
                 else:
-                    print(f"\nLoss!!! \nPerdemos moleque!!!\nPrejuízo: R$ {client.get_profit()}")
+                    print(
+                        f"\nLoss!!! \nPerdemos moleque!!!\nPrejuízo: R$ {client.get_profit()}"
+                    )
             else:
                 print("Falha na operação!!!")
         else:
@@ -236,7 +242,9 @@ async def buy_multiple(orders=10):
         print(order)
         if check_connect:
             # client.change_account("REAL")
-            asset_name, asset_data = await client.get_available_asset(order['asset'], force_open=True)
+            asset_name, asset_data = await client.get_available_asset(
+                order["asset"], force_open=True
+            )
             print(asset_name, asset_data)
             if asset_data[2]:
                 print("OK: Asset está aberto.")
@@ -262,7 +270,9 @@ async def sell_option():
         asset = "EURUSD_otc"  # "EURUSD_otc"
         direction = "put"
         duration = 1000  # in seconds
-        asset_name, asset_data = await client.get_available_asset(asset, force_open=True)
+        asset_name, asset_data = await client.get_available_asset(
+            asset, force_open=True
+        )
         print(asset_name, asset_data)
         if asset_data[2]:
             print("OK: Asset está aberto.")
@@ -312,7 +322,7 @@ async def get_candle():
     candles_color = []
     check_connect, message = await client.connect()
     if check_connect:
-        asset = "CHFJPY_otc"
+        asset = "EURUSD"
         offset = 3600  # in seconds
         period = 60  # in seconds [5, 10, 15, 30, 60, 120, 180, 240, 300, 600, 900, 1800, 3600, 14400, 86400]
         end_from_time = time.time()
@@ -343,7 +353,7 @@ async def get_candle():
 async def get_candle_progressive():
     check_connect, reason = await client.connect()
     if check_connect:
-        asset = "EURJPY_otc"
+        asset = "EURUSD"
         offset = 3600  # in seconds
         period = 60  # in seconds [5, 10, 15, 30, 60, 120, 180, 240, 300, 600, 900, 1800, 3600, 14400, 86400]
         days_of_candle = 1
@@ -385,8 +395,10 @@ async def get_payment():
 async def get_candle_v2():
     check_connect, message = await client.connect()
     if check_connect:
-        asset = "EURUSD_otc"
-        asset_name, asset_data = await client.get_available_asset(asset, force_open=True)
+        asset = "EURUSD"
+        asset_name, asset_data = await client.get_available_asset(
+            asset, force_open=True
+        )
         print(asset_name, asset_data)
         if asset_data[2]:
             print("OK: Asset está aberto.")
@@ -404,9 +416,13 @@ async def get_candle_v2():
 async def get_realtime_candle():
     check_connect, message = await client.connect()
     if check_connect:
-        period = 5  # in seconds [60, 120, 180, 240, 300, 600, 900, 1800, 3600, 14400, 86400]
+        period = (
+            5  # in seconds [60, 120, 180, 240, 300, 600, 900, 1800, 3600, 14400, 86400]
+        )
         asset = "EURUSD_otc"
-        asset_name, asset_data = await client.get_available_asset(asset, force_open=True)
+        asset_name, asset_data = await client.get_available_asset(
+            asset, force_open=True
+        )
         print(asset_name, asset_data)
         if asset_data[2]:
             print("Asset Open")
@@ -426,7 +442,9 @@ async def get_realtime_sentiment():
     check_connect, message = await client.connect()
     if check_connect:
         asset = "EURUSD_otc"
-        asset_name, asset_data = await client.get_available_asset(asset, force_open=True)
+        asset_name, asset_data = await client.get_available_asset(
+            asset, force_open=True
+        )
         if asset_data[2]:
             print("OK: Asset está aberto.")
             client.start_candles_stream(asset, 60)
@@ -493,7 +511,9 @@ async def execute(argument):
         case "balance_refill":
             return await balance_refill()
         case "help":
-            print(f"Uso: {'./app' if getattr(sys, 'frozen', False) else 'python app.py'} <opção>")
+            print(
+                f"Uso: {'./app' if getattr(sys, 'frozen', False) else 'python app.py'} <opção>"
+            )
             return print(get_all_options())
         case _:
             return print("Opção inválida. Use 'help' para obter a lista de opções.")
@@ -501,11 +521,15 @@ async def execute(argument):
 
 async def main():
     if len(sys.argv) != 2:
-        # await test_connection()
+        await connect()
+        await test_connection()
         # await get_balance()
         # await get_profile()
-        await buy_simple()
+        # await buy_simple()
         # await get_candle()
+        # await get_candle_v2()
+        # await get_candle_progressive()
+        # await buy_and_check_win()
         return
 
     option = sys.argv[1]
