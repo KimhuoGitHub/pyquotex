@@ -1,15 +1,17 @@
 """Module for Quotex websocket."""
+
 import os
 import sys
 import time
 import json
 import ssl
 import urllib3
-import requests
+import cloudscraper
 import certifi
 import logging
 import platform
 import threading
+import asyncio
 from . import global_value
 from .http.login import Login
 from .http.logout import Logout
@@ -32,15 +34,17 @@ logger = logging.getLogger(__name__)
 
 # cert_path = certifi.where()
 cert_path = os.path.join("../", "quotex.pem")
-os.environ['SSL_CERT_FILE'] = cert_path
-os.environ['WEBSOCKET_CLIENT_CA_BUNDLE'] = cert_path
-cacert = os.environ.get('WEBSOCKET_CLIENT_CA_BUNDLE')
+os.environ["SSL_CERT_FILE"] = cert_path
+os.environ["WEBSOCKET_CLIENT_CA_BUNDLE"] = cert_path
+cacert = os.environ.get("WEBSOCKET_CLIENT_CA_BUNDLE")
 
-# Configuração do contexto SSL para usar TLS 1.3
+# Updated SSL context setup
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-ssl_context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_TLSv1_2  # Desativar versões TLS mais antigas
-ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3  # Garantir o uso de TLS 1.3
-
+ssl_context.options |= (
+    ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_TLSv1_2
+)  # Disable older TLS versions
+ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3  # Enforce TLS 1.3
+ssl_context.verify_mode = ssl.CERT_REQUIRED
 ssl_context.load_verify_locations(certifi.where())
 
 
@@ -53,6 +57,7 @@ def nested_dict(n, type):
 
 class QuotexAPI(object):
     """Class for communication with Quotex API."""
+
     socket_option_opened = {}
     buy_id = None
     trace_ws = False
@@ -72,15 +77,17 @@ class QuotexAPI(object):
     candles = Candles()
     profile = Profile()
 
-    def __init__(self,
-                 host,
-                 username,
-                 password,
-                 lang,
-                 email_pass=None,
-                 proxies=None,
-                 resource_path=None,
-                 user_data_dir="."):
+    def __init__(
+        self,
+        host,
+        username,
+        password,
+        lang,
+        email_pass=None,
+        proxies=None,
+        resource_path=None,
+        user_data_dir=".",
+    ):
         """
         :param str host: The hostname or ip address of a Quotex server.
         :param str username: The username of a Quotex server.
@@ -131,10 +138,7 @@ class QuotexAPI(object):
 
     def subscribe_realtime_candle(self, asset, period):
         self.realtime_price[asset] = []
-        payload = {
-            "asset": asset,
-            "period": period
-        }
+        payload = {"asset": asset, "period": period}
         data = f'42["instruments/update", {json.dumps(payload)}]'
         return self.send_websocket_request(data)
 
@@ -160,10 +164,7 @@ class QuotexAPI(object):
 
     def change_account(self, account_type):
         self.account_type = account_type
-        payload = {
-            "demo": self.account_type,
-            "tournamentId": 0
-        }
+        payload = {"demo": self.account_type, "tournamentId": 0}
         data = f'42["account/change",{json.dumps(payload)}]'
         self.send_websocket_request(data)
 
@@ -236,51 +237,54 @@ class QuotexAPI(object):
         """
         return GetHistory(self)
 
-    def send_http_request_v1(self, resource, method, data=None, params=None, headers=None):
-        """Send http request to Quotex server.
+    def send_http_request_v1(
+        self, resource, method, data=None, params=None, headers=None
+    ):
+        """Send HTTP request to Quotex server with Cloudflare challenge bypass.
 
-        :param resource: The instance of
-        :class:`Resource <quotexapi.http.resource.Resource>`.
-        :param str method: The http request method.
-        :param dict data: (optional) The http request data.
-        :param dict params: (optional) The http request params.
-        :param dict headers: (optional) The http request headers.
-        :returns: The instance of :class:`Response <requests.Response>`.
+        :param resource: The instance of Resource <quotexapi.http.resource.Resource>.
+        :param str method: The HTTP request method.
+        :param dict data: (optional) The HTTP request data.
+        :param dict params: (optional) The HTTP request params.
+        :param dict headers: (optional) The HTTP request headers.
+        :returns: The instance of Response <requests.Response>.
         """
         url = resource.url
-        logger.debug(url)
-        cookies = self.session_data.get('cookies')
-        user_agent = self.session_data.get('user_agent')
-        if cookies:
-            self.browser.headers["Cookie"] = cookies
-        if user_agent:
-            self.browser.headers["User-Agent"] = user_agent
-        self.browser.headers["Connection"] = "keep-alive"
-        self.browser.headers["Accept-Encoding"] = "gzip, deflate, br"
-        self.browser.headers["Accept-Language"] = "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3"
-        self.browser.headers["Accept"] = (
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+        logger.debug(f"Sending {method} request to URL: {url}")
+        cookies = self.session_data.get("cookies", "")
+        user_agent = self.session_data.get("user_agent", "")
+
+        # Update browser headers dynamically
+        self.browser.headers.update(
+            {
+                "Cookie": cookies,
+                "User-Agent": user_agent,
+                "Connection": "keep-alive",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Referer": headers.get("referer", self.https_url),
+                "Upgrade-Insecure-Requests": "1",
+                "Dnt": "1",
+            }
         )
-        self.browser.headers["Referer"] = headers.get('referer')
-        self.browser.headers["Upgrade-Insecure-Requests"] = "1"
-        self.browser.headers["Sec-Ch-Ua"] = '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"'
-        self.browser.headers["Sec-Ch-Ua-Mobile"] = "?0"
-        self.browser.headers["Sec-Ch-Ua-Platform"] = '"Linux"'
-        self.browser.headers["Sec-Fetch-Site"] = "same-origin"
-        self.browser.headers["Sec-Fetch-User"] = "?1"
-        self.browser.headers["Sec-Fetch-Dest"] = "document"
-        self.browser.headers["Sec-Fetch-Mode"] = "navigate"
-        self.browser.headers["Dnt"] = "1"
-        response = self.browser.send_request(
-            method=method,
-            url=url,
-            data=data,
-            params=params
-        )
+
+        # Use Cloudscraper for bypassing Cloudflare challenges
+        scraper = cloudscraper.create_scraper()
         try:
-            response.raise_for_status()
-        except requests.exceptions.HTTPError:
+            response = scraper.request(
+                method=method.upper(),
+                url=url,
+                data=data,
+                params=params,
+                headers=self.browser.headers,
+            )
+            response.raise_for_status()  # Raise an HTTPError for bad responses
+            logger.debug(f"Response received: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Error in HTTP request: {e}")
             return None
+
         return response
 
     async def get_profile(self):
@@ -306,8 +310,9 @@ class QuotexAPI(object):
         :param str data: The websocket request data.
         :param bool no_force_send: Default None.
         """
-        while (global_value.ssl_Mutual_exclusion
-               or global_value.ssl_Mutual_exclusion_write) and no_force_send:
+        while (
+            global_value.ssl_Mutual_exclusion or global_value.ssl_Mutual_exclusion_write
+        ) and no_force_send:
             pass
         global_value.ssl_Mutual_exclusion_write = True
         self.websocket.send(data)
@@ -317,10 +322,7 @@ class QuotexAPI(object):
     async def authenticate(self):
         print("Quotex Connecting...")
         status, message = await self.login(
-            self.username,
-            self.password,
-            self.email_pass,
-            self.user_data_dir
+            self.username, self.password, self.email_pass, self.user_data_dir
         )
         print(message)
         if not status:
@@ -329,46 +331,61 @@ class QuotexAPI(object):
         self.is_logged = True
 
     async def start_websocket(self):
+        """Start WebSocket connection with retries."""
+        retries = 3
+        retry_delay = 2  # seconds
         global_value.check_websocket_if_connect = None
         global_value.check_websocket_if_error = False
         global_value.websocket_error_reason = None
+
         if not global_value.SSID:
             await self.authenticate()
-        self.websocket_client = WebsocketClient(self)
-        payload = {
-            "ping_interval": 24,
-            "ping_timeout": 20,
-            "ping_payload": "2",
-            "origin": self.https_url,
-            "host": f"ws2.{self.host}",
-            "sslopt": {
-                "check_hostname": False,
-                "cert_reqs": ssl.CERT_NONE,
-                "ca_certs": cacert,
-                "context": ssl_context
-            }
-        }
-        if platform.system() == "Linux":
-            payload["sslopt"]["ssl_version"] = ssl.PROTOCOL_TLS
-        self.websocket_thread = threading.Thread(
-            target=self.websocket.run_forever,
-            kwargs=payload
-        )
-        self.websocket_thread.daemon = True
-        self.websocket_thread.start()
-        while True:
-            if global_value.check_websocket_if_error:
-                return False, global_value.websocket_error_reason
-            elif global_value.check_websocket_if_connect == 0:
-                logger.debug("Websocket conexão fechada.")
-                return False, "Websocket conexão fechada."
-            elif global_value.check_websocket_if_connect == 1:
-                logger.debug("Websocket conectado com sucesso!!!")
-                return True, "Websocket conectado com sucesso!!!"
-            elif global_value.check_rejected_connection == 1:
-                global_value.SSID = None
-                logger.debug("Websocket Token Rejeitado.")
-                return True, "Websocket Token Rejeitado."
+
+        for attempt in range(retries):
+            try:
+                self.websocket_client = WebsocketClient(self)
+                payload = {
+                    "ping_interval": 24,
+                    "ping_timeout": 20,
+                    "ping_payload": "2",
+                    "origin": self.https_url,
+                    "host": f"ws2.{self.host}",
+                    "sslopt": {
+                        "check_hostname": False,
+                        "cert_reqs": ssl.CERT_NONE,
+                        "ca_certs": cacert,
+                        "context": ssl_context,
+                    },
+                }
+                if platform.system() == "Linux":
+                    payload["sslopt"]["ssl_version"] = ssl.PROTOCOL_TLS
+
+                # Start WebSocket connection in a thread
+                self.websocket_thread = threading.Thread(
+                    target=self.websocket.run_forever,
+                    kwargs=payload,
+                )
+                self.websocket_thread.daemon = True
+                self.websocket_thread.start()
+
+                while True:
+                    if global_value.check_websocket_if_error:
+                        raise Exception(global_value.websocket_error_reason)
+                    elif global_value.check_websocket_if_connect == 0:
+                        raise Exception("WebSocket connection closed unexpectedly.")
+                    elif global_value.check_websocket_if_connect == 1:
+                        logger.info("WebSocket connected successfully!")
+                        return True, "WebSocket connected successfully!"
+                    elif global_value.check_rejected_connection == 1:
+                        global_value.SSID = None
+                        raise Exception("WebSocket Token Rejected.")
+
+            except Exception as e:
+                logger.error(f"WebSocket connection attempt {attempt + 1} failed: {e}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(retry_delay)
+                else:
+                    return False, str(e)
 
     def send_ssid(self, timeout=10):
         self.wss_message = None
